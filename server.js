@@ -17,8 +17,14 @@ const NIM_API_KEY = process.env.NIM_API_KEY;
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
 const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 
-// 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
-const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+// 🔥 THINKING MODE TOGGLE - Auto-enabled for models that need it
+// Models that REQUIRE thinking parameter (Endpoint Only models)
+const THINKING_REQUIRED_MODELS = [
+  'deepseek-ai/deepseek-v3.2',
+  'deepseek-ai/deepseek-r1',
+  'qwen/qwen3-next-80b-a3b-thinking',
+  'deepseek-ai/deepseek-r1-distill-qwen-32b'
+];
 
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
@@ -26,10 +32,12 @@ const MODEL_MAPPING = {
   'gpt-4': 'qwen/qwen3-coder-480b-a35b-instruct',
   'gpt-4-turbo': 'moonshotai/kimi-k2-instruct-0905',
   'gpt-4o': 'deepseek-ai/deepseek-v3.1',
+  'gpt-4o-mini': 'meta/llama-3.1-8b-instruct',
   'claude-3-opus': 'openai/gpt-oss-120b',
   'claude-3-sonnet': 'openai/gpt-oss-20b',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking', 
-  'gpt-5' : 'deepseek-ai/deepseek-v3.2'
+  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
+  'o1': 'deepseek-ai/deepseek-v3.2', // Endpoint Only - auto-enables thinking
+  'o1-mini': 'deepseek-ai/deepseek-r1-distill-qwen-32b' // Endpoint Only
 };
 
 // Health check endpoint
@@ -38,7 +46,7 @@ app.get('/health', (req, res) => {
     status: 'ok', 
     service: 'OpenAI to NVIDIA NIM Proxy', 
     reasoning_display: SHOW_REASONING,
-    thinking_mode: ENABLE_THINKING_MODE
+    thinking_models: THINKING_REQUIRED_MODELS
   });
 });
 
@@ -93,16 +101,19 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
     
     // Transform OpenAI request to NIM format
+    // Auto-enable thinking for "Endpoint Only" models
+    const requiresThinking = THINKING_REQUIRED_MODELS.includes(nimModel);
+    
     const nimRequest = {
       model: nimModel,
       messages: messages,
       temperature: temperature || 0.7,
-      max_tokens: max_tokens || 20000, // High limit to prevent premature cutoff
+      max_tokens: max_tokens || 20000,
       top_p: 0.95,
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
-      stop: null, // Don't add custom stop sequences
-      extra_body: ENABLE_THINKING_MODE ? { chat_template_kwargs: { thinking: true } } : undefined,
+      stop: null,
+      extra_body: requiresThinking ? { chat_template_kwargs: { thinking: true } } : undefined,
       stream: stream || false
     };
     
@@ -246,5 +257,5 @@ app.listen(PORT, () => {
   console.log(`OpenAI to NVIDIA NIM Proxy running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
-  console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`Thinking models: ${THINKING_REQUIRED_MODELS.join(', ')}`);
 });
