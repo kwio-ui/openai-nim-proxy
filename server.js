@@ -27,17 +27,27 @@ const THINKING_REQUIRED_MODELS = [
 ];
 
 // Model mapping (adjust based on available NIM models)
+// 📝 Memory | 🎭 Character Consistency | ⚡ Speed | 🎨 Creativity
 const MODEL_MAPPING = {
-  'gpt-3.5-turbo': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-  'gpt-4': 'qwen/qwen3-coder-480b-a35b-instruct',
-  'gpt-4-turbo': 'moonshotai/kimi-k2-instruct-0905',
-  'gpt-4o': 'deepseek-ai/deepseek-v3.1',
-  'gpt-4o-mini': 'meta/llama-3.1-8b-instruct',
-  'claude-3-opus': 'openai/gpt-oss-120b',
-  'claude-3-sonnet': 'openai/gpt-oss-20b',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
-  'o1': 'deepseek-ai/deepseek-v3.2', // Endpoint Only - auto-enables thinking
-  'o1-mini': 'deepseek-ai/deepseek-r1-distill-qwen-32b' // Endpoint Only
+  // 🏆 BEST FOR JANITOR AI ROLEPLAY - Long memory + Character consistency
+  'gpt-4-turbo': 'moonshotai/kimi-k2.5',                     // 📝 1T MoE, video/image understanding, NEWEST!
+  'gpt-4': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',        // 🎭 Best character consistency
+  'claude-3-opus': 'nvidia/llama-3.1-nemotron-ultra-253b-v1', // 🎭 Same reliability
+  
+  // High quality with good memory
+  'gpt-4o': 'moonshotai/kimi-k2-thinking',                   // 📝 256k context, native reasoning
+  'gemini-pro': 'meta/llama-3.1-405b-instruct',              // 📝 Very capable, good memory
+  
+  // Fast but still good quality  
+  'gpt-4o-mini': 'meta/llama-3.1-70b-instruct',              // ⚡ Fast, decent memory
+  'claude-3-sonnet': 'meta/llama-3.1-70b-instruct',          // ⚡ Alternative fast option
+  
+  // Ultra-fast for testing
+  'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',             // ⚡⚡⚡ Fastest
+  
+  // Thinking models (slow but very smart)
+  'o1': 'deepseek-ai/deepseek-v3.2',                         // 🧠 685B reasoning model
+  'o1-mini': 'deepseek-ai/deepseek-r1-distill-qwen-32b'     // 🧠 Faster thinking
 };
 
 // Health check endpoint
