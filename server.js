@@ -39,6 +39,7 @@ const MODEL_MAPPING = {
   'gpt-4o': 'moonshotai/kimi-k2-thinking',                   // 📝 256k context, native reasoning
   'gemini-pro': 'meta/llama-3.1-405b-instruct',
   'gemini-1.5-pro': 'z-ai/glm4.7',// 📝 Very capable, good memory
+  'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash'
   
   // Fast but still good quality  
   'gpt-4o-mini': 'meta/llama-3.1-70b-instruct',              // ⚡ Fast, decent memory
