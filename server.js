@@ -8,8 +8,9 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-
+// Add this line AFTER: const app = express();
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // NVIDIA NIM API configuration
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY = process.env.NIM_API_KEY;
@@ -36,8 +37,8 @@ const MODEL_MAPPING = {
   
   // High quality with good memory
   'gpt-4o': 'moonshotai/kimi-k2-thinking',                   // 📝 256k context, native reasoning
-  'gemini-pro': 'meta/llama-3.1-405b-instruct',              // 📝 Very capable, good memory
-  'gemini-1.5-pro': 'z-ai/glm4.7',                           // 📝 Multilingual, strong reasoning, UI skills
+  'gemini-pro': 'meta/llama-3.1-405b-instruct',
+  'gemini-1.5-pro': 'z-ai/glm4.7',// 📝 Very capable, good memory
   
   // Fast but still good quality  
   'gpt-4o-mini': 'meta/llama-3.1-70b-instruct',              // ⚡ Fast, decent memory
@@ -115,15 +116,11 @@ app.post('/v1/chat/completions', async (req, res) => {
     // Auto-enable thinking for "Endpoint Only" models
     const requiresThinking = THINKING_REQUIRED_MODELS.includes(nimModel);
     
-    // Trim messages to fit model's context window
-    const maxOutputTokens = max_tokens || 20000;
-    const trimmedMessages = trimMessagesToContext(messages, nimModel, maxOutputTokens);
-    
     const nimRequest = {
       model: nimModel,
-      messages: trimmedMessages,  // Use trimmed messages instead of all messages
+      messages: messages,
       temperature: temperature || 0.7,
-      max_tokens: maxOutputTokens,
+      max_tokens: max_tokens || 20000,
       top_p: 0.95,
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
