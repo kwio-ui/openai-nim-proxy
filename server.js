@@ -24,7 +24,8 @@ const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
   'qwen/qwen3-next-80b-a3b-thinking',
-  'deepseek-ai/deepseek-r1-distill-qwen-32b'
+  'deepseek-ai/deepseek-r1-distill-qwen-32b',
+  'qwen/qwen3.5-397b-a17b'
 ];
 
 // Model mapping (adjust based on available NIM models)
