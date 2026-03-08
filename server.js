@@ -25,6 +25,7 @@ const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-r1',
   'qwen/qwen3-next-80b-a3b-thinking',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
+  'mistralai/mistral-large-3-675b-instruct-2512', 
   'qwen/qwen3.5-397b-a17b'
 ];
 
@@ -51,11 +52,11 @@ const MODEL_MAPPING = {
   'claude-3-sonnet': 'meta/llama-3.1-70b-instruct',          // ⚡ Alternative fast option
   
   // Ultra-fast for testing
-  'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',             // ⚡⚡⚡ Fastest
+  'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',
+  'o2': 'mistralai/mistral-large-3-675b-instruct-2512',// ⚡⚡⚡ Fastest
   
   // Thinking models (slow but very smart)
-  'o1': 'deepseek-ai/deepseek-v3.2',
-  'o2': 'mistralai/mistral-large-3-675b-instruct-2512', // 🧠 685B reasoning model
+  'o1': 'deepseek-ai/deepseek-v3.2', // 🧠 685B reasoning model
   'o1-mini': 'deepseek-ai/deepseek-r1-distill-qwen-32b'     // 🧠 Faster thinking
 };
 
