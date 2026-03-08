@@ -42,7 +42,7 @@ const MODEL_MAPPING = {
   'gemini-pro': 'meta/llama-3.1-405b-instruct',
   'gemini-1.5-pro': 'z-ai/glm4.7',// 📝 Very capable, good memory
   'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash',
-  'gemini-1.7-pro': 'minimaxai/minimax-m2.1', 
+  'gemini-1.7-pro': 'mistralai/mistral-large-3-675b-instruct-2512', 
   'gemini-1.8-pro': 'z-ai/glm5',
   'gemini-1.9-pro': 'qwen/qwen3.5-397b-a17b', 
   
