@@ -54,7 +54,8 @@ const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',             // ⚡⚡⚡ Fastest
   
   // Thinking models (slow but very smart)
-  'o1': 'deepseek-ai/deepseek-v3.2',                         // 🧠 685B reasoning model
+  'o1': 'deepseek-ai/deepseek-v3.2',
+  'o2': 'mistralai/mistral-large-3-675b-instruct-2512', // 🧠 685B reasoning model
   'o1-mini': 'deepseek-ai/deepseek-r1-distill-qwen-32b'     // 🧠 Faster thinking
 };
 
