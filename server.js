@@ -53,7 +53,7 @@ const MODEL_MAPPING = {
   
   // Ultra-fast for testing
   'gpt-3.5-turbo': 'meta/llama-3.1-8b-instruct',
-  'o2': 'mistralai/mistral-large-3-675b-instruct-2512',// ⚡⚡⚡ Fastest
+  'gemini-2.6-pro': 'mistralai/mistral-large-3-675b-instruct-2512',// ⚡⚡⚡ Fastest
   
   // Thinking models (slow but very smart)
   'o1': 'deepseek-ai/deepseek-v3.2', // 🧠 685B reasoning model
