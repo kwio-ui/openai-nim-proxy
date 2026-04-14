@@ -23,7 +23,7 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
-  'qwen/qwen3-next-80b-a3b-thinking',
+  'z-ai/glm5.1',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'google/gemma-4-31b-it', 
   'z-ai/glm5'
@@ -39,7 +39,7 @@ const MODEL_MAPPING = {
   
   // High quality with good memory
   'gpt-4o': 'moonshotai/kimi-k2-thinking',                   // 📝 256k context, native reasoning
-  'gemini-pro': 'meta/llama-3.1-405b-instruct',
+  'gemini-pro': 'z-ai/glm5.1',
   'gemini-1.5-pro': 'z-ai/glm4.7',// 📝 Very capable, good memory
   'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash',
   'gemini-1.7-pro': 'google/gemma-4-31b-it', 
