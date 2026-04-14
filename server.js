@@ -44,7 +44,7 @@ const MODEL_MAPPING = {
   'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash',
   'gemini-1.7-pro': 'google/gemma-4-31b-it', 
   'gemini-1.8-pro': 'z-ai/glm5',
-  'gemini-1.9-pro': 'qwen/qwen3.5-397b-a17b', 
+  'gemini-1.9-pro': 'z-ai/glm5.1', 
   
 
   // Fast but still good quality  
