@@ -133,7 +133,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
       stop: null,
-      extra_body: requiresThinking ? { chat_template_kwargs: {thinking:True, clear_thinking:True, do_sample:True, enable_thinking:True} } : undefined,
+      extra_body: requiresThinking ? { chat_template_kwargs: {thinking:true, clear_thinking:true, do_sample:true, enable_thinking:true} } : undefined,
       stream: stream || false
     };
     
