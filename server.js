@@ -26,7 +26,7 @@ const THINKING_REQUIRED_MODELS = [
   'z-ai/glm5.1',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'google/gemma-4-31b-it', 
-  'z-ai/glm5'
+  'z-ai/glm5.2'
 ];
 
 // Model mapping (adjust based on available NIM models)
@@ -133,7 +133,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       frequency_penalty: 0.0,
       presence_penalty: 0.0,
       stop: null,
-      extra_body: requiresThinking ? { chat_template_kwargs: {thinking:true, clear_thinking:true, do_sample:true, enable_thinking:true,clear_thinking:false} } : undefined,
+      extra_body: requiresThinking ? { chat_template_kwargs: {thinking:true, clear_thinking:true, do_sample:true, enable_thinking:true, clear_thinking:false} } : undefined,
       stream: stream || false
     };
     
