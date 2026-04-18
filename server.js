@@ -134,7 +134,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       presence_penalty: 0.0,
       stop: null,
       extra_body: requiresThinking ? { chat_template_kwargs: {thinking:true, clear_thinking:true, do_sample:true, enable_thinking:true, clear_thinking:true} } : undefined,
-      stream: stream || false
+      stream: stream || true
     };
     
     // Make request to NVIDIA NIM API
