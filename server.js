@@ -23,7 +23,7 @@ const SHOW_REASONING = true; // Set to true to show reasoning with <think> tags
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
-  'z-ai/glm5.1',
+  'z-ai/glm-5.1',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'google/gemma-4-31b-it', 
   'z-ai/glm5.2'
@@ -44,7 +44,7 @@ const MODEL_MAPPING = {
   'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash',
   'gemini-1.7-pro': 'google/gemma-4-31b-it', 
   'gemini-1.8-pro': 'z-ai/glm5',
-  'gemini-1.9-pro': 'z-ai/glm5.1', 
+  'gemini-1.9-pro': 'z-ai/glm-5.1', 
   
 
   // Fast but still good quality  
