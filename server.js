@@ -33,7 +33,7 @@ const THINKING_REQUIRED_MODELS = [
 // 📝 Memory | 🎭 Character Consistency | ⚡ Speed | 🎨 Creativity
 const MODEL_MAPPING = {
   // 🏆 BEST FOR JANITOR AI ROLEPLAY - Long memory + Character consistency
-  'gpt-4-turbo': 'moonshotai/kimi-k2.5',                     // 📝 1T MoE, video/image understanding, NEWEST!
+  'gpt-4-turbo': 'moonshotai/kimi-k2.6',                     // 📝 1T MoE, video/image understanding, NEWEST!
   'gpt-4': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',        // 🎭 Best character consistency
   'claude-3-opus': 'nvidia/llama-3.1-nemotron-ultra-253b-v1', // 🎭 Same reliability
   
