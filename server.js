@@ -154,7 +154,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
       function closeThinkBlock() {
         if (reasoningOpen && !thinkingClosed) {
-          emitSynthetic('<think>\n\n');
+          emitSynthetic('</think>\n\n');
           thinkingClosed = true;
           reasoningOpen = false;
         }
