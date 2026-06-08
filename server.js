@@ -248,7 +248,7 @@ app.post('/v1/chat/completions', async function(req, res) {
         var finalContent = (choice.message && choice.message.content) ? choice.message.content : '';
 
         if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
-          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + finalContent;
+          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE +'<think>' + finalContent;
         }
 
         return {
