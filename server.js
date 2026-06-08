@@ -154,7 +154,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
       function closeThinkBlock() {
         if (reasoningOpen && !thinkingClosed) {
-          emitSynthetic('<think>\n\n');
+          emitSynthetic('</think>\n\n');
           thinkingClosed = true;
           reasoningOpen = false;
         }
@@ -197,7 +197,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (reasoning) {
                 if (!reasoningOpen) {
-                  combined += '<think>\n' + reasoning;
+                  combined += '</think>\n' + reasoning;
                   reasoningOpen = true;
                 } else {
                   combined += reasoning;
@@ -206,7 +206,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (content) {
                 if (reasoningOpen && !thinkingClosed) {
-                  combined += '<think>\n\n' + content;
+                  combined += '</think>\n\n' + content;
                   thinkingClosed = true;
                   reasoningOpen = false;
                 } else {
