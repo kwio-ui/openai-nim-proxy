@@ -2,7 +2,9 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-
+// Replace these two constants at the top of your file
+const THINK_OPEN  = '【thinking】\n';
+const THINK_CLOSE = '【/thinking】\n\n';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -154,7 +156,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
       function closeThinkBlock() {
         if (reasoningOpen && !thinkingClosed) {
-          emitSynthetic('</think>\n\n');
+          emitSynthetic(THINK_CLOSE);
           thinkingClosed = true;
           reasoningOpen = false;
         }
@@ -197,7 +199,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (reasoning) {
                 if (!reasoningOpen) {
-                  combined += '<think>\n' + reasoning;
+                  combined += THINK_OPEN + reasoning;
                   reasoningOpen = true;
                 } else {
                   combined += reasoning;
@@ -206,7 +208,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (content) {
                 if (reasoningOpen && !thinkingClosed) {
-                  combined += '</think> <think>\n\n' + content;
+                  combined += THINK_CLOSE + content;
                   thinkingClosed = true;
                   reasoningOpen = false;
                 } else {
@@ -246,7 +248,7 @@ app.post('/v1/chat/completions', async function(req, res) {
         var finalContent = (choice.message && choice.message.content) ? choice.message.content : '';
 
         if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
-          finalContent = '<think>\n' + choice.message.reasoning_content + '\n</think><think>\n\n' + finalContent;
+          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + finalContent;
         }
 
         return {
