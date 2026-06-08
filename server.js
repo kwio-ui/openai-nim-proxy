@@ -208,7 +208,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (content) {
                 if (reasoningOpen && !thinkingClosed) {
-                  combined += THINK_CLOSE +'<think>'+ content;
+                  combined += THINK_CLOSE + content;
                   thinkingClosed = true;
                   reasoningOpen = false;
                 } else {
