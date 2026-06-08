@@ -206,7 +206,7 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (content) {
                 if (reasoningOpen && !thinkingClosed) {
-                  combined += '<think>\n\n' + content;
+                  combined += '</think> <think>\n\n' + content;
                   thinkingClosed = true;
                   reasoningOpen = false;
                 } else {
@@ -246,7 +246,7 @@ app.post('/v1/chat/completions', async function(req, res) {
         var finalContent = (choice.message && choice.message.content) ? choice.message.content : '';
 
         if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
-          finalContent = '<think>\n' + choice.message.reasoning_content + '\n<think>\n\n' + finalContent;
+          finalContent = '<think>\n' + choice.message.reasoning_content + '\n</think><think>\n\n' + finalContent;
         }
 
         return {
