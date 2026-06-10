@@ -29,11 +29,11 @@ const THINKING_REQUIRED_MODELS = [
 
 const MODEL_MAPPING = {
   'gpt-4-turbo':    'moonshotai/kimi-k2.6',
-  'gpt-4':          'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-  'claude-3-opus':  'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  'gpt-4':          'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+  'claude-3-opus': 'deepseek-ai/deepseek-v4-flash',
   'gpt-4o':         'moonshotai/kimi-k2-thinking',
   'gemini-pro':     'nvidia/nemotron-3-ultra-550b-a55b',
-  'gemini-1.5-pro': 'z-ai/glm4.7',
+  'gemini-1.5-pro': 'qwen/qwen3.5-397b-a17b',
   'gemini-1.6-pro': 'stepfun-ai/step-3.5-flash',
   'gemini-1.7-pro': 'google/gemma-4-31b-it',
   'gemini-1.8-pro': 'deepseek-ai/deepseek-v4-pro',
