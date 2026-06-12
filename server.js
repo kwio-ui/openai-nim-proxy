@@ -4,7 +4,7 @@ const cors = require('cors');
 const axios = require('axios');
 // Replace these two constants at the top of your file
 const THINK_OPEN  = '<think>\n';
-const THINK_CLOSE = '<think>\n\n';
+const THINK_CLOSE = '\n<think>\n\n';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
