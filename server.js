@@ -121,7 +121,8 @@ app.post('/v1/chat/completions', async function(req, res) {
         thinking: true,
         clear_thinking: true,
         do_sample: true,
-        enable_thinking: true
+        enable_thinking: true, 
+        reasoning_budget:16384
       },
       stream: useStream
     };
