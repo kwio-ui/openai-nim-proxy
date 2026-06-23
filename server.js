@@ -42,7 +42,7 @@ const MODEL_MAPPING = {
   'claude-3-sonnet':'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo':  'meta/llama-3.1-8b-instruct',
   'gemini-2.6-pro': 'mistralai/mistral-large-3-675b-instruct-2512',
-  'o1':             'deepseek-ai/deepseek-v3.2',
+  'o1':             'MuXodious/Qwen2.5-7B-Instruct-1M-Thinking-Claude-Gemini-GPT5.2-DISTILL-PaperWitch-heresy',
   'o1-mini':        'deepseek-ai/deepseek-r1-distill-qwen-32b'
 };
 
