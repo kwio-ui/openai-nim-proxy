@@ -35,7 +35,7 @@ const MODEL_MAPPING = {
   'gemini-pro':     'nvidia/nemotron-3-ultra-550b-a55b',
   'gemini-1.5-pro': 'qwen/qwen3.5-397b-a17b',
   'gemini-1.6-pro': 'google/diffusiongemma-26b-a4b-it',
-  'gemini-1.7-pro': 'google/gemma-4-31b-it',
+  'gemini-1.7-pro': 'MuXodious/Qwen2.5-7B-Instruct-1M-Thinking-Claude-Gemini-GPT5.2-DISTILL-PaperWitch-heresy',
   'gemini-1.8-pro': 'deepseek-ai/deepseek-v4-pro',
   'gemini-1.9-pro': 'z-ai/glm-5.1',
   'gpt-4o-mini':    'meta/llama-3.1-70b-instruct',
