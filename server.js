@@ -21,7 +21,7 @@ const SHOW_REASONING = true;
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
-  'z-ai/glm-5.1',
+  'z-ai/glm-5.2',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'google/gemma-4-31b-it',
   'deepseek-ai/deepseek-v4-pro'
@@ -109,24 +109,21 @@ app.post('/v1/chat/completions', async function(req, res) {
     const nimModel = await resolveModel(model);
 
     const nimRequest = {
-      model: nimModel,
-      messages: messages,
-      temperature: temperature || 0.7,
-      max_tokens: max_tokens || 20000,
-      top_p: 0.95,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
-      stop: null,
-      chat_template_kwargs: {
-        thinking: true,
-        clear_thinking: true,
-        do_sample: true,
-        enable_thinking: true, 
-        reasoning_budget:16384
-      },
-      stream: useStream
-    };
-
+  model: nimModel,
+  messages: messages,
+  temperature: temperature || 0.7,
+  max_tokens: max_tokens || 20000,
+  top_p: 0.95,
+  stream: useStream,
+  extra_body: {                  // ✅ correct
+    chat_template_kwargs: {
+      enable_thinking: true,
+      thinking: true
+    },
+    reasoning_budget: 16384
+  }
+};
+    
     const nimResponse = await axios.post(
       `${NIM_API_BASE}/chat/completions`,
       nimRequest,
