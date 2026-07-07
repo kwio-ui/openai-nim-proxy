@@ -16,30 +16,21 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY  = process.env.NIM_API_KEY;
 
-// Set to true to show reasoning inside <think> tags, false to strip it
 const SHOW_REASONING = true;
 
-// These models only accept the base OpenAI fields.
-// Sending ANY extra fields (chat_template_kwargs, reasoning_budget, etc.) causes 410.
-// They think automatically with no opt-in required.
-const PLAIN_MODELS = [
+// GLM-5.2 and these models only accept a strict whitelist of fields.
+// Any extra field (frequency_penalty, presence_penalty, logit_bias, n,
+// user, stop, best_of, etc.) sent by JanitorAI causes 410.
+const STRICT_MODELS = [
   'z-ai/glm-5.2',
   'z-ai/glm-5.1',
   'z-ai/glm4.7',
-  'moonshotai/kimi-k2.6',
-  'moonshotai/kimi-k2-thinking',
-  'minimaxai/minimax-m3',
-  'google/diffusiongemma-26b-a4b-it',
-  'qwen/qwen3.5-397b-a17b',
-  'mistralai/mistral-large-3-675b-instruct-2512',
-  'meta/llama-3.1-405b-instruct',
-  'meta/llama-3.1-70b-instruct',
-  'meta/llama-3.1-8b-instruct',
-  'deepseek-ai/deepseek-v4-flash',
 ];
 
-// These models REQUIRE chat_template_kwargs to activate thinking.
-// Without them the model either hangs or returns empty content.
+// Exact whitelist of fields GLM-5.2 accepts — nothing else allowed
+const STRICT_ALLOWED_FIELDS = ['model', 'messages', 'temperature', 'top_p', 'max_tokens', 'seed', 'stream'];
+
+// Models that need chat_template_kwargs to activate thinking
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
@@ -90,29 +81,42 @@ async function resolveModel(model) {
   return 'meta/llama-3.1-8b-instruct';
 }
 
-// Build the NIM request body.
-// CRITICAL: Only send chat_template_kwargs for models that need it.
-// GLM-5.2 and PLAIN_MODELS reject ANY unknown field with 410.
-function buildNimRequest(nimModel, messages, temperature, max_tokens, useStream) {
+function buildNimRequest(nimModel, fullBody, useStream) {
+  const isStrict   = STRICT_MODELS.includes(nimModel);
   const needsThink = THINKING_REQUIRED_MODELS.includes(nimModel);
 
-  const body = {
-    model:       nimModel,
-    messages:    messages,
-    temperature: temperature || 1,
-    max_tokens:  max_tokens  || 16384,
-    top_p:       1,
-    stream:      useStream,
-  };
+  let body;
 
-  if (needsThink) {
-    // Placed at the top level of the JSON body — NOT in extra_body
-    // (extra_body is a Python SDK abstraction, not an HTTP field)
-    body.chat_template_kwargs = { enable_thinking: true, thinking: true };
-    body.reasoning_budget = 16384;
+  if (isStrict) {
+    // WHITELIST ONLY — strip every field JanitorAI sends that GLM-5.2 rejects
+    body = {};
+    for (const field of STRICT_ALLOWED_FIELDS) {
+      if (fullBody[field] !== undefined) body[field] = fullBody[field];
+    }
+    // Always override model with the resolved NIM model
+    body.model      = nimModel;
+    body.stream     = useStream;
+    body.max_tokens = fullBody.max_tokens || 16384;
+    body.temperature = fullBody.temperature || 1;
+    body.top_p      = 1;
+  } else {
+    // For non-strict models pass through common fields
+    body = {
+      model:             nimModel,
+      messages:          fullBody.messages,
+      temperature:       fullBody.temperature || 0.7,
+      max_tokens:        fullBody.max_tokens  || 16384,
+      top_p:             fullBody.top_p       || 0.95,
+      stream:            useStream,
+      frequency_penalty: fullBody.frequency_penalty || 0,
+      presence_penalty:  fullBody.presence_penalty  || 0,
+    };
+
+    if (needsThink) {
+      body.chat_template_kwargs = { enable_thinking: true, thinking: true };
+      body.reasoning_budget = 16384;
+    }
   }
-
-  // PLAIN_MODELS (including z-ai/glm-5.2): only the 6 fields above, nothing else
 
   return body;
 }
@@ -127,14 +131,12 @@ function makeContentChunk(content, baseData) {
   };
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-
 app.get('/health', function (req, res) {
   res.json({
     status: 'ok',
     service: 'OpenAI to NVIDIA NIM Proxy',
     reasoning_display: SHOW_REASONING,
-    plain_models: PLAIN_MODELS,
+    strict_models: STRICT_MODELS,
     thinking_required_models: THINKING_REQUIRED_MODELS,
   });
 });
@@ -150,17 +152,15 @@ app.get('/v1/models', function (req, res) {
 
 app.post('/v1/chat/completions', async function (req, res) {
   try {
-    const { model, messages, temperature, max_tokens, stream } = req.body;
+    const { model, stream } = req.body;
     const useStream = stream !== false;
 
     const nimModel   = await resolveModel(model);
-    const nimRequest = buildNimRequest(nimModel, messages, temperature, max_tokens, useStream);
+    const nimRequest = buildNimRequest(nimModel, req.body, useStream);
 
-    console.log(
-      `[proxy] ${model} → ${nimModel} | stream=${useStream}` +
-      ` | thinking_kwargs=${!!nimRequest.chat_template_kwargs}` +
-      ` | body_keys=${Object.keys(nimRequest).join(',')}`
-    );
+    // Log exactly what we're sending so you can debug future issues
+    console.log(`[proxy] ${model} → ${nimModel} | stream=${useStream} | strict=${STRICT_MODELS.includes(nimModel)}`);
+    console.log(`[proxy] sending fields: ${Object.keys(nimRequest).join(', ')}`);
 
     const nimResponse = await axios.post(
       `${NIM_API_BASE}/chat/completions`,
@@ -174,7 +174,7 @@ app.post('/v1/chat/completions', async function (req, res) {
       }
     );
 
-    // ── Streaming path ────────────────────────────────────────────────────────
+    // ── Streaming ─────────────────────────────────────────────────────────────
     if (useStream) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -278,12 +278,11 @@ app.post('/v1/chat/completions', async function (req, res) {
         res.end();
       });
 
-    // ── Non-streaming path ────────────────────────────────────────────────────
+    // ── Non-streaming ─────────────────────────────────────────────────────────
     } else {
       var choices = nimResponse.data.choices.map(function (choice) {
         var finalContent = (choice.message && choice.message.content)
-          ? choice.message.content
-          : '';
+          ? choice.message.content : '';
 
         if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
           finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + finalContent;
@@ -302,9 +301,7 @@ app.post('/v1/chat/completions', async function (req, res) {
         created: Math.floor(Date.now() / 1000),
         model:   model,
         choices: choices,
-        usage:   nimResponse.data.usage || {
-          prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
-        },
+        usage:   nimResponse.data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       });
     }
 
@@ -336,11 +333,7 @@ app.post('/v1/chat/completions', async function (req, res) {
 
 app.all('*', function (req, res) {
   res.status(404).json({
-    error: {
-      message: 'Endpoint ' + req.path + ' not found',
-      type:    'invalid_request_error',
-      code:    404,
-    },
+    error: { message: 'Endpoint ' + req.path + ' not found', type: 'invalid_request_error', code: 404 },
   });
 });
 
