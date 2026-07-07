@@ -2,9 +2,10 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-// Replace these two constants at the top of your file
+
 const THINK_OPEN  = '<think>\n';
 const THINK_CLOSE = '\n</think>\n\n';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,24 +14,37 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
-const NIM_API_KEY = process.env.NIM_API_KEY;
+const NIM_API_KEY  = process.env.NIM_API_KEY;
 
 // Set to true to show reasoning inside <think> tags, false to strip it
 const SHOW_REASONING = true;
 
+// Models that require chat_template_kwargs to activate thinking
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
-  'z-ai/glm-5.2',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
+  'deepseek-ai/deepseek-v4-pro',
   'google/gemma-4-31b-it',
-  'deepseek-ai/deepseek-v4-pro'
+];
+
+// Models that think BY DEFAULT and must be explicitly opted OUT
+// (sending enable_thinking: true to these is redundant but harmless;
+//  however sending it to non-thinking models causes 410 errors)
+const THINKING_DEFAULT_MODELS = [
+  'z-ai/glm-5.1',
+  'z-ai/glm-5.2',
+  'z-ai/glm4.7',
+  'moonshotai/kimi-k2-thinking',
+  'moonshotai/kimi-k2.6',
+  'nvidia/nemotron-3-ultra-550b-a55b',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
 ];
 
 const MODEL_MAPPING = {
   'gpt-4-turbo':    'moonshotai/kimi-k2.6',
   'gpt-4':          'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
-  'claude-3-opus': 'deepseek-ai/deepseek-v4-flash',
+  'claude-3-opus':  'deepseek-ai/deepseek-v4-flash',
   'gpt-4o':         'moonshotai/kimi-k2-thinking',
   'gemini-pro':     'nvidia/nemotron-3-ultra-550b-a55b',
   'gemini-1.5-pro': 'qwen/qwen3.5-397b-a17b',
@@ -42,8 +56,7 @@ const MODEL_MAPPING = {
   'claude-3-sonnet':'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo':  'meta/llama-3.1-8b-instruct',
   'gemini-2.6-pro': 'mistralai/mistral-large-3-675b-instruct-2512',
-  'o1':             'MuXodious/Qwen2.5-7B-Instruct-1M-Thinking-Claude-Gemini-GPT5.2-DISTILL-PaperWitch-heresy',
-  'o1-mini':        'deepseek-ai/deepseek-r1-distill-qwen-32b'
+  'o1-mini':        'deepseek-ai/deepseek-r1-distill-qwen-32b',
 };
 
 async function resolveModel(model) {
@@ -55,7 +68,7 @@ async function resolveModel(model) {
       { model, messages: [{ role: 'user', content: 'test' }], max_tokens: 1 },
       {
         headers: { Authorization: `Bearer ${NIM_API_KEY}`, 'Content-Type': 'application/json' },
-        validateStatus: s => s < 500
+        validateStatus: s => s < 500,
       }
     );
     if (test.status >= 200 && test.status < 300) return model;
@@ -71,96 +84,114 @@ async function resolveModel(model) {
 
 function makeContentChunk(content, baseData) {
   return {
-    id:      baseData && baseData.id      ? baseData.id      : ('chatcmpl-' + Date.now()),
-    object:  baseData && baseData.object  ? baseData.object  : 'chat.completion.chunk',
-    created: baseData && baseData.created ? baseData.created : Math.floor(Date.now() / 1000),
-    model:   baseData && baseData.model   ? baseData.model   : '',
-    choices: [{ index: 0, delta: { content: content }, finish_reason: null }]
+    id:      (baseData && baseData.id)      ? baseData.id      : ('chatcmpl-' + Date.now()),
+    object:  (baseData && baseData.object)  ? baseData.object  : 'chat.completion.chunk',
+    created: (baseData && baseData.created) ? baseData.created : Math.floor(Date.now() / 1000),
+    model:   (baseData && baseData.model)   ? baseData.model   : '',
+    choices: [{ index: 0, delta: { content: content }, finish_reason: null }],
   };
 }
 
-app.get('/health', function(req, res) {
+// Build the NIM request body.
+// KEY FIX: chat_template_kwargs and reasoning_budget go at the TOP LEVEL of the
+// JSON body — NOT inside any "extra_body" wrapper.  "extra_body" is an OpenAI
+// Python-SDK concept that the SDK merges before sending; axios sends JSON as-is,
+// so wrapping in extra_body literally forwards {"extra_body":{...}} which NIM
+// rejects with 410.
+function buildNimRequest(nimModel, messages, temperature, max_tokens, useStream) {
+  const needsThinkingKwargs =
+    THINKING_REQUIRED_MODELS.includes(nimModel) ||
+    THINKING_DEFAULT_MODELS.includes(nimModel);
+
+  const body = {
+    model:       nimModel,
+    messages:    messages,
+    temperature: temperature || 0.7,
+    max_tokens:  max_tokens  || 20000,
+    top_p:       0.95,
+    stream:      useStream,
+  };
+
+  if (needsThinkingKwargs) {
+    // Placed at the top level — this is what NIM actually reads.
+    body.chat_template_kwargs = {
+      enable_thinking: true,
+      thinking:        true,
+    };
+    body.reasoning_budget = 16384;
+  }
+
+  return body;
+}
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+app.get('/health', function (req, res) {
   res.json({
     status: 'ok',
     service: 'OpenAI to NVIDIA NIM Proxy',
     reasoning_display: SHOW_REASONING,
-    thinking_models: THINKING_REQUIRED_MODELS
+    thinking_required_models: THINKING_REQUIRED_MODELS,
+    thinking_default_models:  THINKING_DEFAULT_MODELS,
   });
 });
 
-app.get('/v1/models', function(req, res) {
+app.get('/v1/models', function (req, res) {
   res.json({
     object: 'list',
-    data: Object.keys(MODEL_MAPPING).map(function(id) {
+    data: Object.keys(MODEL_MAPPING).map(function (id) {
       return { id: id, object: 'model', created: Date.now(), owned_by: 'nvidia-nim-proxy' };
-    })
+    }),
   });
 });
 
-app.post('/v1/chat/completions', async function(req, res) {
+app.post('/v1/chat/completions', async function (req, res) {
   try {
-    const model = req.body.model;
-    const messages = req.body.messages;
-    const temperature = req.body.temperature;
-    const max_tokens = req.body.max_tokens;
-    const stream = req.body.stream;
+    const { model, messages, temperature, max_tokens, stream } = req.body;
     const useStream = stream !== false;
 
-    const nimModel = await resolveModel(model);
+    const nimModel  = await resolveModel(model);
+    const nimRequest = buildNimRequest(nimModel, messages, temperature, max_tokens, useStream);
 
-    const nimRequest = {
-  model: nimModel,
-  messages: messages,
-  temperature: temperature || 0.7,
-  max_tokens: max_tokens || 20000,
-  top_p: 0.95,
-  stream: useStream,
-  extra_body: {                  // ✅ correct
-    chat_template_kwargs: {
-      enable_thinking: true,
-      thinking: true
-    },
-    reasoning_budget: 16384
-  }
-};
-    
+    console.log(`[proxy] ${model} → ${nimModel} | stream=${useStream} | thinking_kwargs=${!!nimRequest.chat_template_kwargs}`);
+
     const nimResponse = await axios.post(
       `${NIM_API_BASE}/chat/completions`,
       nimRequest,
       {
         headers: {
           Authorization: `Bearer ${NIM_API_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        responseType: useStream ? 'stream' : 'json'
+        responseType: useStream ? 'stream' : 'json',
       }
     );
 
+    // ── Streaming path ────────────────────────────────────────────────────────
     if (useStream) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      var buffer = '';
-      var reasoningOpen = false;
+      var buffer        = '';
+      var reasoningOpen  = false;
       var thinkingClosed = false;
-      var lastBaseData = null;
+      var lastBaseData   = null;
 
       function emitSynthetic(content) {
         if (!content) return;
-        var chunk = makeContentChunk(content, lastBaseData);
-        res.write('data: ' + JSON.stringify(chunk) + '\n\n');
+        res.write('data: ' + JSON.stringify(makeContentChunk(content, lastBaseData)) + '\n\n');
       }
 
       function closeThinkBlock() {
         if (reasoningOpen && !thinkingClosed) {
           emitSynthetic(THINK_CLOSE);
           thinkingClosed = true;
-          reasoningOpen = false;
+          reasoningOpen  = false;
         }
       }
 
-      nimResponse.data.on('data', function(chunk) {
+      nimResponse.data.on('data', function (chunk) {
         buffer += chunk.toString();
         var lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -179,7 +210,7 @@ app.post('/v1/chat/completions', async function(req, res) {
             var data = JSON.parse(line.slice(6));
             lastBaseData = data;
 
-            var delta = data.choices && data.choices[0] && data.choices[0].delta
+            var delta = (data.choices && data.choices[0] && data.choices[0].delta)
               ? data.choices[0].delta
               : null;
 
@@ -189,7 +220,7 @@ app.post('/v1/chat/completions', async function(req, res) {
             }
 
             var reasoning = delta.reasoning_content || '';
-            var content = delta.content || '';
+            var content   = delta.content           || '';
             delete delta.reasoning_content;
 
             if (SHOW_REASONING) {
@@ -208,7 +239,7 @@ app.post('/v1/chat/completions', async function(req, res) {
                 if (reasoningOpen && !thinkingClosed) {
                   combined += THINK_CLOSE + content;
                   thinkingClosed = true;
-                  reasoningOpen = false;
+                  reasoningOpen  = false;
                 } else {
                   combined += content;
                 }
@@ -216,7 +247,6 @@ app.post('/v1/chat/completions', async function(req, res) {
 
               if (!combined) continue;
               delta.content = combined;
-
             } else {
               if (!content) continue;
               delta.content = content;
@@ -230,75 +260,85 @@ app.post('/v1/chat/completions', async function(req, res) {
         }
       });
 
-      nimResponse.data.on('end', function() {
+      nimResponse.data.on('end', function () {
         closeThinkBlock();
         res.end();
       });
 
-      nimResponse.data.on('error', function(err) {
+      nimResponse.data.on('error', function (err) {
         console.error('Stream error:', err);
         closeThinkBlock();
         res.end();
       });
 
+    // ── Non-streaming path ────────────────────────────────────────────────────
     } else {
-      var choices = nimResponse.data.choices.map(function(choice) {
+      var choices = nimResponse.data.choices.map(function (choice) {
         var finalContent = (choice.message && choice.message.content) ? choice.message.content : '';
 
         if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
-          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE  + finalContent;
+          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + finalContent;
         }
 
         return {
-          index: choice.index,
-          message: { role: choice.message.role, content: finalContent },
-          finish_reason: choice.finish_reason
+          index:         choice.index,
+          message:       { role: choice.message.role, content: finalContent },
+          finish_reason: choice.finish_reason,
         };
       });
 
       res.json({
-        id: 'chatcmpl-' + Date.now(),
-        object: 'chat.completion',
+        id:      'chatcmpl-' + Date.now(),
+        object:  'chat.completion',
         created: Math.floor(Date.now() / 1000),
-        model: model,
+        model:   model,
         choices: choices,
-        usage: nimResponse.data.usage || {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0
-        }
+        usage:   nimResponse.data.usage || {
+          prompt_tokens: 0, completion_tokens: 0, total_tokens: 0,
+        },
       });
     }
 
   } catch (error) {
     console.error('Proxy error:', error.message);
-    if (error.response && error.response.data) {
-      console.error('NIM error body:', error.response.data);
+
+    // Log the raw NIM error body so you can see exactly what NIM rejected
+    if (error.response) {
+      console.error('NIM status:', error.response.status);
+      if (error.response.data) {
+        // For stream responses the data is a stream; read it for debugging
+        if (typeof error.response.data.on === 'function') {
+          let raw = '';
+          error.response.data.on('data', c => raw += c.toString());
+          error.response.data.on('end', () => console.error('NIM error body:', raw));
+        } else {
+          console.error('NIM error body:', JSON.stringify(error.response.data));
+        }
+      }
     }
 
     res.status((error.response && error.response.status) || 500).json({
       error: {
         message: error.message || 'Internal server error',
-        type: 'invalid_request_error',
-        code: (error.response && error.response.status) || 500
-      }
+        type:    'invalid_request_error',
+        code:    (error.response && error.response.status) || 500,
+      },
     });
   }
 });
 
-app.all('*', function(req, res) {
+app.all('*', function (req, res) {
   res.status(404).json({
     error: {
       message: 'Endpoint ' + req.path + ' not found',
-      type: 'invalid_request_error',
-      code: 404
-    }
+      type:    'invalid_request_error',
+      code:    404,
+    },
   });
 });
 
-app.listen(PORT, function() {
+app.listen(PORT, function () {
   console.log('OpenAI to NVIDIA NIM Proxy running on port ' + PORT);
   console.log('Health check: http://localhost:' + PORT + '/health');
   console.log('Reasoning display: ' + (SHOW_REASONING ? 'ENABLED' : 'DISABLED'));
-  console.log('Thinking models: ' + THINKING_REQUIRED_MODELS.join(', '));
 });
