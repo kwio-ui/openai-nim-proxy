@@ -37,7 +37,7 @@ const MODEL_MAPPING = {
   'gemini-1.6-pro': 'google/diffusiongemma-26b-a4b-it',
   'gemini-1.7-pro': 'minimaxai/minimax-m3',
   'gemini-1.8-pro': 'deepseek-ai/deepseek-v4-pro',
-  'gemini-1.9-pro': 'z-ai/glm-5.1',
+  'gemini-1.9-pro': 'z-ai/glm-5.2',
   'gpt-4o-mini':    'meta/llama-3.1-70b-instruct',
   'claude-3-sonnet':'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo':  'meta/llama-3.1-8b-instruct',
