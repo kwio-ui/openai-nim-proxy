@@ -19,27 +19,59 @@ const NIM_API_KEY  = process.env.NIM_API_KEY;
 const SHOW_REASONING = true;
 
 // GLM-5.2 and these models only accept a strict whitelist of fields.
-// Any extra field (frequency_penalty, presence_penalty, logit_bias, n,
-// user, stop, best_of, etc.) sent by JanitorAI causes 410.
 const STRICT_MODELS = [
-  'z-ai/glm-5.3',
+  'z-ai/glm-5.2',
   'z-ai/glm-5.1',
   'z-ai/glm4.7',
 ];
 
-// Exact whitelist of fields GLM-5.2 accepts — nothing else allowed
+// Exact whitelist of fields GLM-5.2 accepts
 const STRICT_ALLOWED_FIELDS = ['model', 'messages', 'temperature', 'top_p', 'max_tokens', 'stream'];
 
 // Models that need chat_template_kwargs to activate thinking
 const THINKING_REQUIRED_MODELS = [
-  'deepseek-ai/deepseek-v3.2',
   'z-ai/glm-5.2',
-  'moonshotai/kimi-k2.6', 
+  'z-ai/glm-5.1',
+  'z-ai/glm4.7',
+  'deepseek-ai/deepseek-v3.2',
   'deepseek-ai/deepseek-r1',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'deepseek-ai/deepseek-v4-pro',
   'nvidia/nemotron-3-ultra-550b-a55b',
   'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+];
+
+// Models that return thinking inline as <think>...</think> in content
+// instead of a separate reasoning_content field
+const INLINE_THINKING_MODELS = [
+  'moonshotai/kimi-k2.6',
+  'moonshotai/kimi-k2-thinking',
+  'z-ai/glm-5.2',
+  'z-ai/glm-5.1',
+  'z-ai/glm4.7',
+];
+
+// All known valid NIM model names — bypass live test and fallback for these
+const ALL_KNOWN_NIM_MODELS = [
+  'z-ai/glm-5.2',
+  'z-ai/glm-5.1',
+  'z-ai/glm4.7',
+  'moonshotai/kimi-k2.6',
+  'moonshotai/kimi-k2-thinking',
+  'deepseek-ai/deepseek-v3.2',
+  'deepseek-ai/deepseek-r1',
+  'deepseek-ai/deepseek-r1-distill-qwen-32b',
+  'deepseek-ai/deepseek-v4-pro',
+  'deepseek-ai/deepseek-v4-flash',
+  'nvidia/nemotron-3-ultra-550b-a55b',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
+  'qwen/qwen3.5-397b-a17b',
+  'google/diffusiongemma-26b-a4b-it',
+  'minimaxai/minimax-m3',
+  'mistralai/mistral-large-3-675b-instruct-2512',
+  'meta/llama-3.1-405b-instruct',
+  'meta/llama-3.1-70b-instruct',
+  'meta/llama-3.1-8b-instruct',
 ];
 
 const MODEL_MAPPING = {
@@ -61,8 +93,13 @@ const MODEL_MAPPING = {
 };
 
 async function resolveModel(model) {
+  // If it's already a known NIM model, return as-is — no live test, no fallback
+  if (ALL_KNOWN_NIM_MODELS.includes(model)) return model;
+
+  // Check alias mapping
   if (MODEL_MAPPING[model]) return MODEL_MAPPING[model];
 
+  // Try live test for unknown models
   try {
     const test = await axios.post(
       `${NIM_API_BASE}/chat/completions`,
@@ -75,6 +112,7 @@ async function resolveModel(model) {
     if (test.status >= 200 && test.status < 300) return model;
   } catch (_) {}
 
+  // Last resort keyword fallback
   const lower = model.toLowerCase();
   if (lower.includes('gpt-4') || lower.includes('claude-opus') || lower.includes('405b'))
     return 'meta/llama-3.1-405b-instruct';
@@ -83,29 +121,77 @@ async function resolveModel(model) {
   return 'meta/llama-3.1-8b-instruct';
 }
 
+// Sanitize messages to avoid 400 errors on strict models:
+// - Remove invalid roles
+// - Remove empty content
+// - Ensure system message is first only
+// - Ensure strict user/assistant alternation
+function sanitizeMessages(messages) {
+  const VALID_ROLES = ['system', 'user', 'assistant'];
+
+  // Filter invalid roles and empty content
+  let filtered = messages.filter(m => {
+    if (!VALID_ROLES.includes(m.role)) return false;
+    if (!m.content || m.content.toString().trim() === '') return false;
+    return true;
+  });
+
+  // Pull out system message (first one only)
+  const systemMsg = filtered.find(m => m.role === 'system');
+  const rest = filtered.filter(m => m.role !== 'system');
+
+  // Enforce strict user/assistant alternation
+  const alternated = [];
+  let lastRole = null;
+  for (const msg of rest) {
+    if (msg.role === lastRole) {
+      // Merge consecutive same-role messages
+      if (alternated.length > 0) {
+        alternated[alternated.length - 1].content += '\n' + msg.content;
+      }
+    } else {
+      alternated.push({ role: msg.role, content: msg.content });
+      lastRole = msg.role;
+    }
+  }
+
+  // Must start with user
+  if (alternated.length > 0 && alternated[0].role === 'assistant') {
+    alternated.shift();
+  }
+
+  return systemMsg ? [systemMsg, ...alternated] : alternated;
+}
+
 function buildNimRequest(nimModel, fullBody, useStream) {
   const isStrict   = STRICT_MODELS.includes(nimModel);
   const needsThink = THINKING_REQUIRED_MODELS.includes(nimModel);
 
+  const sanitizedMessages = sanitizeMessages(fullBody.messages || []);
+
   let body;
 
   if (isStrict) {
-    // WHITELIST ONLY — strip every field JanitorAI sends that GLM-5.2 rejects
+    // WHITELIST ONLY — strip every field GLM rejects
     body = {};
     for (const field of STRICT_ALLOWED_FIELDS) {
       if (fullBody[field] !== undefined) body[field] = fullBody[field];
     }
-    // Always override model with the resolved NIM model
-    body.model      = nimModel;
-    body.stream     = useStream;
-    body.max_tokens = fullBody.max_tokens || 16384;
+    body.model       = nimModel;
+    body.stream      = useStream;
+    body.messages    = sanitizedMessages;
+    body.max_tokens  = fullBody.max_tokens || 16384;
     body.temperature = fullBody.temperature || 1;
-    body.top_p      = 1;
+    body.top_p       = 1;
+
+    // Enable thinking for strict models that support it
+    if (needsThink) {
+      body.chat_template_kwargs = { enable_thinking: true };
+    }
   } else {
-    // For non-strict models pass through common fields
     body = {
       model:             nimModel,
-      messages:          fullBody.messages,
+      messages:          sanitizedMessages,
       temperature:       fullBody.temperature || 0.7,
       max_tokens:        fullBody.max_tokens  || 16384,
       top_p:             fullBody.top_p       || 0.95,
@@ -139,6 +225,7 @@ app.get('/health', function (req, res) {
     service: 'OpenAI to NVIDIA NIM Proxy',
     reasoning_display: SHOW_REASONING,
     strict_models: STRICT_MODELS,
+    inline_thinking_models: INLINE_THINKING_MODELS,
     thinking_required_models: THINKING_REQUIRED_MODELS,
   });
 });
@@ -160,8 +247,9 @@ app.post('/v1/chat/completions', async function (req, res) {
     const nimModel   = await resolveModel(model);
     const nimRequest = buildNimRequest(nimModel, req.body, useStream);
 
-    // Log exactly what we're sending so you can debug future issues
-    console.log(`[proxy] ${model} → ${nimModel} | stream=${useStream} | strict=${STRICT_MODELS.includes(nimModel)}`);
+    const isInlineThinking = INLINE_THINKING_MODELS.includes(nimModel);
+
+    console.log(`[proxy] ${model} → ${nimModel} | stream=${useStream} | strict=${STRICT_MODELS.includes(nimModel)} | inlineThink=${isInlineThinking}`);
     console.log(`[proxy] sending fields: ${Object.keys(nimRequest).join(', ')}`);
 
     const nimResponse = await axios.post(
@@ -182,10 +270,16 @@ app.post('/v1/chat/completions', async function (req, res) {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
+      // ── All state is declared per-request inside here (no leaking between requests) ──
       var buffer         = '';
       var reasoningOpen  = false;
       var thinkingClosed = false;
       var lastBaseData   = null;
+
+      // State for inline <think>...</think> models (Kimi, GLM)
+      var inlineThinkBuffer = '';
+      var inlineThinkOpen   = false;
+      var inlineThinkDone   = false;
 
       function emitSynthetic(content) {
         if (!content) return;
@@ -197,6 +291,56 @@ app.post('/v1/chat/completions', async function (req, res) {
           emitSynthetic(THINK_CLOSE);
           thinkingClosed = true;
           reasoningOpen  = false;
+        }
+      }
+
+      // Handle content for models that return <think> tags inline in content
+      function handleInlineThinkContent(content) {
+        if (!content) return;
+
+        inlineThinkBuffer += content;
+
+        if (!inlineThinkDone) {
+          if (!inlineThinkOpen) {
+            // Check if think tag is starting
+            if (inlineThinkBuffer.includes('<think>')) {
+              inlineThinkOpen = true;
+              const parts = inlineThinkBuffer.split('<think>');
+              // Anything before <think> is normal content
+              if (parts[0]) emitSynthetic(parts[0]);
+              // Emit THINK_OPEN and content after <think>
+              const afterOpen = parts.slice(1).join('<think>');
+              emitSynthetic(THINK_OPEN + afterOpen);
+              inlineThinkBuffer = afterOpen;
+            } else if (!('<think>'.startsWith(inlineThinkBuffer.slice(-7)))) {
+              // No think tag coming — flush as normal content
+              inlineThinkDone = true;
+              emitSynthetic(inlineThinkBuffer);
+              inlineThinkBuffer = '';
+            }
+            // else: partial '<think>' at end of buffer, keep buffering
+          } else {
+            // Inside <think>, watching for </think>
+            if (inlineThinkBuffer.includes('</think>')) {
+              inlineThinkDone = true;
+              const parts = inlineThinkBuffer.split('</think>');
+              // Emit closing of think block
+              emitSynthetic(parts[0] + THINK_CLOSE);
+              thinkingClosed = true;
+              reasoningOpen  = false;
+              inlineThinkBuffer = '';
+              // Emit everything after </think> as normal content
+              const afterClose = parts.slice(1).join('</think>');
+              if (afterClose) emitSynthetic(afterClose);
+            } else {
+              // Still inside think, stream it live
+              emitSynthetic(content);
+            }
+          }
+        } else {
+          // Past think block — normal content passthrough
+          emitSynthetic(content);
+          inlineThinkBuffer = '';
         }
       }
 
@@ -233,6 +377,14 @@ app.post('/v1/chat/completions', async function (req, res) {
             delete delta.reasoning_content;
 
             if (SHOW_REASONING) {
+
+              // ── Inline thinking models (Kimi, GLM): <think> in content field ──
+              if (isInlineThinking && content) {
+                handleInlineThinkContent(content);
+                continue;
+              }
+
+              // ── Models with separate reasoning_content field (DeepSeek etc) ──
               var combined = '';
 
               if (reasoning) {
@@ -256,7 +408,9 @@ app.post('/v1/chat/completions', async function (req, res) {
 
               if (!combined) continue;
               delta.content = combined;
+
             } else {
+              // SHOW_REASONING = false: skip reasoning, only pass content
               if (!content) continue;
               delta.content = content;
             }
@@ -283,11 +437,25 @@ app.post('/v1/chat/completions', async function (req, res) {
     // ── Non-streaming ─────────────────────────────────────────────────────────
     } else {
       var choices = nimResponse.data.choices.map(function (choice) {
-        var finalContent = (choice.message && choice.message.content)
+        var rawContent = (choice.message && choice.message.content)
           ? choice.message.content : '';
 
-        if (SHOW_REASONING && choice.message && choice.message.reasoning_content) {
-          finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + finalContent;
+        var finalContent = rawContent;
+
+        if (SHOW_REASONING) {
+          // Models with separate reasoning_content field
+          if (choice.message && choice.message.reasoning_content) {
+            finalContent = THINK_OPEN + choice.message.reasoning_content + THINK_CLOSE + rawContent;
+          }
+          // Inline thinking models: reformat <think>...</think> to proxy format
+          else if (INLINE_THINKING_MODELS.includes(nimModel) && rawContent.includes('<think>')) {
+            finalContent = rawContent
+              .replace('<think>', THINK_OPEN)
+              .replace('</think>', THINK_CLOSE);
+          }
+        } else {
+          // Strip inline think tags entirely when SHOW_REASONING = false
+          finalContent = rawContent.replace(/<think>[\s\S]*?<\/think>\s*/g, '');
         }
 
         return {
@@ -316,9 +484,13 @@ app.post('/v1/chat/completions', async function (req, res) {
         if (typeof error.response.data.on === 'function') {
           let raw = '';
           error.response.data.on('data', c => { raw += c.toString(); });
-          error.response.data.on('end',  () => { console.error('NIM error body:', raw); });
+          error.response.data.on('end',  () => {
+            console.error('NIM error body:', raw);
+            console.error('NIM request was:', JSON.stringify(error.config && error.config.data, null, 2));
+          });
         } else {
           console.error('NIM error body:', JSON.stringify(error.response.data));
+          console.error('NIM request was:', JSON.stringify(error.config && error.config.data, null, 2));
         }
       }
     }
