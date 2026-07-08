@@ -46,7 +46,7 @@ const THINKING_REQUIRED_MODELS = [
 const INLINE_THINKING_MODELS = [
   'moonshotai/kimi-k2.6',
   'moonshotai/kimi-k2-thinking',
-  'z-ai/glm-5.2',
+  'z-ai/glm-5.3',
   'z-ai/glm-5.1',
   'z-ai/glm4.7',
 ];
