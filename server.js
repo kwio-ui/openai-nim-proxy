@@ -28,7 +28,7 @@ const STRICT_MODELS = [
 ];
 
 // Exact whitelist of fields GLM-5.2 accepts — nothing else allowed
-const STRICT_ALLOWED_FIELDS = ['model', 'messages', 'temperature', 'top_p', 'max_tokens', 'seed', 'stream'];
+const STRICT_ALLOWED_FIELDS = ['model', 'messages', 'temperature', 'top_p', 'max_tokens', 'stream'];
 
 // Models that need chat_template_kwargs to activate thinking
 const THINKING_REQUIRED_MODELS = [
