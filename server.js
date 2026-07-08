@@ -22,7 +22,7 @@ const SHOW_REASONING = true;
 // Any extra field (frequency_penalty, presence_penalty, logit_bias, n,
 // user, stop, best_of, etc.) sent by JanitorAI causes 410.
 const STRICT_MODELS = [
-  'z-ai/glm-5.2',
+  'z-ai/glm-5.3',
   'z-ai/glm-5.1',
   'z-ai/glm4.7',
 ];
