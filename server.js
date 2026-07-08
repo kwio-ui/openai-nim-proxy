@@ -33,6 +33,7 @@ const STRICT_ALLOWED_FIELDS = ['model', 'messages', 'temperature', 'top_p', 'max
 // Models that need chat_template_kwargs to activate thinking
 const THINKING_REQUIRED_MODELS = [
   'deepseek-ai/deepseek-v3.2',
+  'z-ai/glm-5.2', 
   'deepseek-ai/deepseek-r1',
   'deepseek-ai/deepseek-r1-distill-qwen-32b',
   'deepseek-ai/deepseek-v4-pro',
